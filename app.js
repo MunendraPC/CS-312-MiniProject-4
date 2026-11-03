@@ -1,12 +1,12 @@
 require("dotenv").config();
 
 const express = require("express");
-const path = require("path");
-const { Pool } = require("pg");
+const cors = require("cors");
 const session = require("express-session");
+const { Pool } = require("pg");
 
 const app = express();
-const PORT = 3000;
+const PORT = 8000;
 
 
 // PostgreSQL connection
@@ -19,11 +19,13 @@ const db = new Pool({
 });
 
 
-app.set("view engine", "ejs");
+// Middleware
+app.use(express.json());
 
-app.use(express.urlencoded({ extended: true }));
-
-app.use(express.static(path.join(__dirname, "public")));
+app.use(cors({
+    origin: "http://localhost:5173",
+    credentials: true
+}));
 
 app.use(session({
     secret: process.env.SESSION_SECRET,
@@ -32,204 +34,274 @@ app.use(session({
 }));
 
 
-// SIGN IN
-
-app.get("/signin", (req, res) => {
-    res.render("signin", {
-        message: ""
+// TEST
+app.get("/api/test", (req, res) => {
+    res.json({
+        message: "React is connected to Express!"
     });
 });
 
 
-app.post("/signin", async (req, res) => {
+// CURRENT USER
+app.get("/api/me", (req, res) => {
 
-    const userId = req.body.user_id;
-    const password = req.body.password;
-
-    try {
-
-        const result = await db.query(
-            "SELECT * FROM users WHERE user_id = $1 AND password = $2",
-            [userId, password]
-        );
-
-        if (result.rows.length === 0) {
-
-            return res.render("signin", {
-                message: "Incorrect user ID or password."
-            });
-
-        }
-
-        req.session.user = result.rows[0];
-
-        res.redirect("/");
-
-    } catch (error) {
-
-        console.log(error);
-        res.send("Error signing in.");
-
+    if (!req.session.user) {
+        return res.status(401).json({
+            message: "Not signed in."
+        });
     }
+
+    res.json({
+        user: req.session.user
+    });
 });
 
 
 // SIGN UP
+app.post("/api/signup", async (req, res) => {
 
-app.get("/signup", (req, res) => {
-
-    res.render("signup", {
-        message: ""
-    });
-
-});
-
-
-app.post("/signup", async (req, res) => {
-
-    const userId = req.body.user_id;
-    const password = req.body.password;
-    const name = req.body.name;
+    const { user_id, password, name } = req.body;
 
     try {
 
         const existingUser = await db.query(
             "SELECT * FROM users WHERE user_id = $1",
-            [userId]
+            [user_id]
         );
 
         if (existingUser.rows.length > 0) {
-
-            return res.render("signup", {
+            return res.status(400).json({
                 message: "That user ID is already taken."
             });
-
         }
 
         await db.query(
-            "INSERT INTO users (user_id, password, name) VALUES ($1, $2, $3)",
-            [userId, password, name]
+            `INSERT INTO users
+            (user_id, password, name)
+            VALUES ($1, $2, $3)`,
+            [
+                user_id,
+                password,
+                name
+            ]
         );
 
-        res.redirect("/signin");
-
-    } catch (error) {
-
-        console.log(error);
-        res.send("Error creating account.");
-
-    }
-});
-
-
-// LOGOUT
-
-app.get("/logout", (req, res) => {
-
-    req.session.destroy(() => {
-        res.redirect("/signin");
-    });
-
-});
-
-
-// HOME / VIEW POSTS
-
-app.get("/", async (req, res) => {
-
-    if (!req.session.user) {
-        return res.redirect("/signin");
-    }
-
-    const selectedCategory = req.query.category || "All";
-
-    try {
-
-        const result = await db.query(
-            `SELECT
-                blog_id,
-                creator_name AS creator,
-                creator_user_id,
-                title,
-                body AS content,
-                category,
-                date_created AS "createdAt"
-             FROM blogs
-             ORDER BY date_created DESC`
-        );
-
-        res.render("index", {
-            posts: result.rows,
-            selectedCategory: selectedCategory,
-            user: req.session.user
+        res.json({
+            message: "Account created successfully."
         });
 
     } catch (error) {
 
         console.log(error);
-        res.send("Error loading posts.");
 
+        res.status(500).json({
+            message: "Error creating account."
+        });
     }
 });
 
 
-// CREATE POST
+// SIGN IN
+app.post("/api/signin", async (req, res) => {
 
-app.post("/posts", async (req, res) => {
-
-    if (!req.session.user) {
-        return res.redirect("/signin");
-    }
-
-    const title = req.body.title;
-    const category = req.body.category;
-    const content = req.body.content;
-
-    const creatorName = req.session.user.name;
-    const creatorUserId = req.session.user.user_id;
+    const { user_id, password } = req.body;
 
     try {
 
-        await db.query(
-            `INSERT INTO blogs
-            (creator_name, creator_user_id, title, body, date_created, category)
-            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, $5)`,
+        const result = await db.query(
+            `SELECT *
+             FROM users
+             WHERE user_id = $1
+             AND password = $2`,
             [
-                creatorName,
-                creatorUserId,
-                title,
-                content,
-                category
+                user_id,
+                password
             ]
         );
 
-        res.redirect("/");
+        if (result.rows.length === 0) {
+            return res.status(401).json({
+                message: "Incorrect user ID or password."
+            });
+        }
+
+        req.session.user = result.rows[0];
+
+        res.json({
+            message: "Signed in successfully.",
+            user: result.rows[0]
+        });
 
     } catch (error) {
 
         console.log(error);
-        res.send("Error creating post.");
 
+        res.status(500).json({
+            message: "Error signing in."
+        });
     }
 });
 
-// EDIT PAGE
 
-app.get("/edit/:id", async (req, res) => {
+// LOGOUT
+app.post("/api/logout", (req, res) => {
+
+    req.session.destroy(() => {
+
+        res.json({
+            message: "Logged out."
+        });
+
+    });
+});
+
+
+// GET ALL BLOGS
+app.get("/api/blogs", async (req, res) => {
 
     if (!req.session.user) {
-        return res.redirect("/signin");
+        return res.status(401).json({
+            message: "Please sign in."
+        });
     }
-
-    const blogId = req.params.id;
 
     try {
 
         const result = await db.query(
             `SELECT *
              FROM blogs
+             ORDER BY date_created DESC`
+        );
+
+        res.json(result.rows);
+
+    } catch (error) {
+
+        console.log(error);
+
+        res.status(500).json({
+            message: "Error loading blogs."
+        });
+    }
+});
+
+
+// CREATE BLOG
+app.post("/api/blogs", async (req, res) => {
+
+    if (!req.session.user) {
+        return res.status(401).json({
+            message: "Please sign in."
+        });
+    }
+
+    const { title, body, category } = req.body;
+
+    try {
+
+        const result = await db.query(
+            `INSERT INTO blogs
+            (
+                creator_name,
+                creator_user_id,
+                title,
+                body,
+                date_created,
+                category
+            )
+            VALUES
+            ($1, $2, $3, $4, CURRENT_TIMESTAMP, $5)
+            RETURNING *`,
+            [
+                req.session.user.name,
+                req.session.user.user_id,
+                title,
+                body,
+                category
+            ]
+        );
+
+        res.json(result.rows[0]);
+
+    } catch (error) {
+
+        console.log(error);
+
+        res.status(500).json({
+            message: "Error creating blog."
+        });
+    }
+});
+
+
+// UPDATE BLOG
+app.put("/api/blogs/:id", async (req, res) => {
+
+    if (!req.session.user) {
+        return res.status(401).json({
+            message: "Please sign in."
+        });
+    }
+
+    const blogId = req.params.id;
+    const { title, body, category } = req.body;
+
+    try {
+
+        const result = await db.query(
+            `UPDATE blogs
+             SET title = $1,
+                 body = $2,
+                 category = $3
+             WHERE blog_id = $4
+             AND creator_user_id = $5
+             RETURNING *`,
+            [
+                title,
+                body,
+                category,
+                blogId,
+                req.session.user.user_id
+            ]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(403).json({
+                message: "You can only edit your own posts."
+            });
+        }
+
+        res.json(result.rows[0]);
+
+    } catch (error) {
+
+        console.log(error);
+
+        res.status(500).json({
+            message: "Error updating blog."
+        });
+    }
+});
+
+
+// DELETE BLOG
+app.delete("/api/blogs/:id", async (req, res) => {
+
+    if (!req.session.user) {
+        return res.status(401).json({
+            message: "Please sign in."
+        });
+    }
+
+    const blogId = req.params.id;
+
+    try {
+
+        const result = await db.query(
+            `DELETE FROM blogs
              WHERE blog_id = $1
-             AND creator_user_id = $2`,
+             AND creator_user_id = $2
+             RETURNING *`,
             [
                 blogId,
                 req.session.user.user_id
@@ -237,98 +309,26 @@ app.get("/edit/:id", async (req, res) => {
         );
 
         if (result.rows.length === 0) {
-            return res.send("You can only edit your own posts.");
+            return res.status(403).json({
+                message: "You can only delete your own posts."
+            });
         }
 
-        res.render("edit", {
-            post: result.rows[0]
+        res.json({
+            message: "Blog deleted."
         });
 
     } catch (error) {
 
         console.log(error);
-        res.send("Error loading post.");
 
-    }
-});
-
-
-// UPDATE POST
-
-app.post("/edit/:id", async (req, res) => {
-
-    if (!req.session.user) {
-        return res.redirect("/signin");
-    }
-
-    const blogId = req.params.id;
-
-    const title = req.body.title;
-    const category = req.body.category;
-    const content = req.body.content;
-
-    try {
-
-        await db.query(
-            `UPDATE blogs
-             SET title = $1,
-                 body = $2,
-                 category = $3
-             WHERE blog_id = $4
-             AND creator_user_id = $5`,
-            [
-                title,
-                content,
-                category,
-                blogId,
-                req.session.user.user_id
-            ]
-        );
-
-        res.redirect("/");
-
-    } catch (error) {
-
-        console.log(error);
-        res.send("Error updating post.");
-
-    }
-});
-
-
-// DELETE POST
-
-app.post("/delete/:id", async (req, res) => {
-
-    if (!req.session.user) {
-        return res.redirect("/signin");
-    }
-
-    const blogId = req.params.id;
-
-    try {
-
-        await db.query(
-            `DELETE FROM blogs
-             WHERE blog_id = $1
-             AND creator_user_id = $2`,
-            [
-                blogId,
-                req.session.user.user_id
-            ]
-        );
-
-        res.redirect("/");
-
-    } catch (error) {
-
-        console.log(error);
-        res.send("Error deleting post.");
-
+        res.status(500).json({
+            message: "Error deleting blog."
+        });
     }
 });
 
 
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Backend running on http://localhost:${PORT}`);
 });

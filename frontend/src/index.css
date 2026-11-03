@@ -1,0 +1,196 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f4f6f8;
+    color: #222;
+}
+
+button,
+input,
+textarea,
+select {
+    font: inherit;
+}
+
+.header {
+    background-color: #1e3a5f;
+    color: white;
+    padding: 20px 5%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header h1 {
+    margin: 0;
+}
+
+.user-area {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.container {
+    width: 90%;
+    max-width: 900px;
+    margin: 30px auto;
+}
+
+.form-card,
+.post-card,
+.auth-card,
+.edit-card {
+    background-color: white;
+    padding: 25px;
+    margin-bottom: 22px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.form-card h2,
+.post-card h3 {
+    color: #1e3a5f;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+label {
+    font-weight: bold;
+}
+
+input,
+textarea,
+select {
+    width: 100%;
+    padding: 11px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
+
+textarea {
+    resize: vertical;
+}
+
+button {
+    background-color: #1e3a5f;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #315b88;
+}
+
+.logout-button {
+    background-color: #555;
+}
+
+.delete-button {
+    background-color: #b83232;
+}
+
+.delete-button:hover {
+    background-color: #922727;
+}
+
+.secondary-button {
+    background-color: #666;
+}
+
+.post-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.post-body {
+    line-height: 1.6;
+}
+
+.filter-section {
+    background-color: white;
+    padding: 18px;
+    margin-bottom: 25px;
+    border-radius: 10px;
+}
+
+.filter-section label {
+    margin-right: 10px;
+}
+
+.filter-section select {
+    width: auto;
+}
+
+.auth-page {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.auth-card,
+.edit-card {
+    width: 100%;
+    max-width: 550px;
+}
+
+.auth-card h1,
+.edit-card h1 {
+    text-align: center;
+    color: #1e3a5f;
+}
+
+.error {
+    color: #b83232;
+    font-weight: bold;
+}
+
+@media (max-width: 600px) {
+    .header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+
+    .user-area {
+        flex-direction: column;
+    }
+
+    .container {
+        width: 94%;
+    }
+
+    .form-card,
+    .post-card,
+    .auth-card,
+    .edit-card {
+        padding: 18px;
+    }
+
+    .post-buttons {
+        flex-direction: column;
+    }
+
+    .post-buttons button {
+        width: 100%;
+    }
+
+    .filter-section select {
+        width: 100%;
+        margin-top: 10px;
+    }
+}
